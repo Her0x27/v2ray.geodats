@@ -1,6 +1,6 @@
-### [ Автоматическая генерация геоданных и конфигураций маршрутизации ]
+**[ Автоматическая генерация геоданных и конфигураций маршрутизации ]**
 
-## Данный репозиторий содержит:
+#### Данный репозиторий содержит:
 - Скрипты для генерации файлов геоданных:
   - `geosite.dat` – на основе списка доменов из [domains.lst](https://antifilter.download/list/domains.lst) с тегом `antizapret`.
   - `geoip.dat` – на основе списка IP-сетей из [allyouneed.lst](https://antifilter.download/list/allyouneed.lst) с тегом `antifilter`.
@@ -22,6 +22,80 @@
     "queryStrategy": "UseIPv4"
   }
 }
+```
+
+## Генерация Routing:
+**1. Маршрутизация по Geodat**
+```python
+"""
+    - Трафик для доменов из geosite (например, geosite:antizapret) и
+      IP-сетей из geoip (например, geoip:antifilter) направляется через outbound "proxy".
+    - Остальной трафик, включая DNS (при отсутствии обработки sniffing’ом), отправляется напрямую ("direct").
+    """
+    config = {
+        "routing": {
+            "domainStrategy": "IPIfNonMatch",
+            "rules": [
+                {
+                    "type": "field",
+                    "domain": ["geosite:antizapret"],
+                    "outboundTag": "proxy"
+                },
+                {
+                    "type": "field",
+                    "ip": ["geoip:antifilter"],
+                    "outboundTag": "proxy"
+                },
+                {
+                    "type": "field",
+                    "protocol": ["dns"],
+                    "outboundTag": "direct"
+                },
+                {
+                    "type": "field",
+                    "ip": ["0.0.0.0/0", "::/0"],
+                    "outboundTag": "direct"
+                }
+            ]
+        }
+    }
+```
+
+**2. Маршрутизация по Geodat + AdGuard DNS**
+```python
+"""
+    - Первым правилом перенаправляются все DNS-запросы через outbound "adguard-dns".
+      Это позволяет использовать локально развернутый AdGuard DNS-сервер (на 127.0.0.1) в рамках hiddify.
+    - Трафик для доменов и IP, соответствующих геоданным, перенаправляется через outbound "proxy".
+    - Остальной трафик направляется напрямую ("direct").
+    """
+    config = {
+        "routing": {
+            "domainStrategy": "IPIfNonMatch",
+            "rules": [
+                {
+                    "type": "field",
+                    "protocol": ["dns"],
+                    "outboundTag": "adguard-dns"
+                },
+                {
+                    "type": "field",
+                    "domain": ["geosite:antizapret"],
+                    "outboundTag": "proxy"
+                },
+                {
+                    "type": "field",
+                    "ip": ["geoip:antifilter"],
+                    "outboundTag": "proxy"
+                },
+                {
+                    "type": "field",
+                    "ip": ["0.0.0.0/0", "::/0"],
+                    "outboundTag": "direct"
+                }
+            ]
+        }
+    }
 ```
 
 ## Примечания по безопасности
